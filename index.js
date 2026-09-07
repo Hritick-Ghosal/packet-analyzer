@@ -2,6 +2,7 @@ import fs from 'fs';
 import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
 import express from 'express';
 import { WebSocketServer } from 'ws';
 import { Worker, MessageChannel } from 'worker_threads';
@@ -24,10 +25,21 @@ const rules = {
   blockedIPs: ['192.168.1.50']
 };
 
-if (!fs.existsSync(inputFile)) {
-  console.error(`Input file "${inputFile}" not found! Run "node generate_pcap.js" first.`);
-  process.exit(1);
+// Helper: Ensure the PCAP file exists on cloud platforms (e.g., Render)
+function ensurePcapFileExists() {
+  if (!fs.existsSync(inputFile)) {
+    console.log(`[DPI Engine] "${inputFile}" not found. Generating test PCAP traffic...`);
+    try {
+      execSync('node generate_pcap.js', { stdio: 'inherit' });
+      console.log(`[DPI Engine] Successfully generated "${inputFile}".`);
+    } catch (err) {
+      console.error('[DPI Engine] Failed to generate sample PCAP:', err.message);
+    }
+  }
 }
+
+// Initial check on boot
+ensurePcapFileExists();
 
 // In-memory state to hydrate newly connected/refreshed browsers
 const serverState = {
@@ -84,6 +96,16 @@ let isRunning = false;
 async function runPipeline() {
   if (isRunning) return;
   isRunning = true;
+
+  // Guarantee the input file exists before opening stream
+  ensurePcapFileExists();
+
+  if (!fs.existsSync(inputFile)) {
+    console.error(`[Reader Error] Input file "${inputFile}" still does not exist.`);
+    broadcast({ type: 'STATUS', status: 'COMPLETED' });
+    isRunning = false;
+    return;
+  }
 
   // Reset state
   serverState.total = 0;
