@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deep Packet Inspection (DPI) Monitor</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="navbar">
+      <div class="brand">
+        <span class="logo-icon">⚡</span>
+        <div>
+          <h1>Packet Analyzer Engine</h1>
+          <p class="subtitle">Multi-Threaded Deep Packet Inspection & Telemetry</p>
+        </div>
+      </div>
+      <div class="status-indicator">
+        <span id="ws-dot" class="dot disconnected"></span>
+        <span id="ws-text" class="status-label">Disconnected</span>
+      </div>
+    </header>
+
+    <!-- Top Metrics Grid -->
+    <section class="stats-grid">
+      <div class="card stat-card">
+        <span class="stat-label">Total Packets Parsed</span>
+        <span id="stat-total-packets" class="stat-value">0</span>
+      </div>
+      <div class="card stat-card">
+        <span class="stat-label">TLS Flows Detected</span>
+        <span id="stat-tls-flows" class="stat-value">0</span>
+      </div>
+      <div class="card stat-card">
+        <span class="stat-label">Unique SNI Hostnames</span>
+        <span id="stat-unique-sni" class="stat-value">0</span>
+      </div>
+      <div class="card stat-card">
+        <span class="stat-label">Worker Engine Status</span>
+        <span id="engine-status" class="stat-value status-idle">Idle</span>
+      </div>
+    </section>
+
+    <!-- Controls Bar -->
+    <section class="controls-bar card">
+      <div class="controls-left">
+        <button id="run-btn" class="btn btn-primary">
+          <span class="btn-icon">▶</span> Run Inspection
+        </button>
+        <button id="clear-btn" class="btn btn-secondary">Clear Tables</button>
+      </div>
+      <div id="status-message" class="system-status">Ready to analyze capture streams.</div>
+    </section>
+
+    <!-- Main Data Panes -->
+    <main class="dashboard-split">
+      <!-- Left Column: Extracted TLS SNI Details -->
+      <section class="card panel">
+        <div class="panel-header">
+          <h2>Extracted TLS Hostnames (SNI)</h2>
+          <span class="badge">Layer 7</span>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Source IP:Port</th>
+                <th>Target Hostname (SNI)</th>
+              </tr>
+            </thead>
+            <tbody id="sni-table-body">
+              <tr class="empty-placeholder">
+                <td colspan="3">No SNI hostnames captured yet. Click "Run Inspection".</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Right Column: Live Ingestion Log -->
+      <section class="card panel">
+        <div class="panel-header">
+          <h2>Live Stream Telemetry</h2>
+          <span class="badge">Raw Frames</span>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Flow</th>
+                <th>Protocol</th>
+                <th>Length</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody id="packet-table-body">
+              <tr class="empty-placeholder">
+                <td colspan="4">Stream awaiting payload...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

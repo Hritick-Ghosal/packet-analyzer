@@ -1,0 +1,15 @@
+{
+  "name": "dpi-engine-mt",
+  "version": "1.0.0",
+  "description": "Multi-threaded Deep Packet Inspection engine in Node.js",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js test_dpi.pcap filtered.pcap",
+    "generate": "node generate_pcap.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "ws": "^8.21.3"
+  }
+}
