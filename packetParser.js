@@ -1,45 +1,35 @@
-function ipToString(buf, offset) {
-  return `${buf[offset]}.${buf[offset + 1]}.${buf[offset + 2]}.${buf[offset + 3]}`;
-}
+export function parsePacket(packetData) {
+  try {
+    if (packetData.length < 34) return null; // Minimum Ethernet + IPv4 length
 
-export function parsePacket(rawBuf) {
-  if (rawBuf.length < 14) return null;
+    // Check EtherType: IPv4 (0x0800)
+    const etherType = packetData.readUInt16BE(12);
+    if (etherType !== 0x0800) return null;
 
-  const etherType = rawBuf.readUInt16BE(12);
-  if (etherType !== 0x0800 || rawBuf.length < 34) return null;
+    const ipStart = 14;
+    const ihl = (packetData[ipStart] & 0x0f) * 4;
+    const protocol = packetData[ipStart + 9];
 
-  const ipHeaderLen = (rawBuf[14] & 0x0f) * 4;
-  const protocol = rawBuf[23];
-  const srcIp = ipToString(rawBuf, 26);
-  const dstIp = ipToString(rawBuf, 30);
+    // Check TCP Protocol (6)
+    if (protocol !== 6) return null;
 
-  if (protocol === 6) {
-    const tcpOffset = 14 + ipHeaderLen;
-    if (rawBuf.length < tcpOffset + 20) return null;
+    const srcIp = `${packetData[ipStart + 12]}.${packetData[ipStart + 13]}.${packetData[ipStart + 14]}.${packetData[ipStart + 15]}`;
+    const dstIp = `${packetData[ipStart + 16]}.${packetData[ipStart + 17]}.${packetData[ipStart + 18]}.${packetData[ipStart + 19]}`;
 
-    const srcPort = rawBuf.readUInt16BE(tcpOffset);
-    const dstPort = rawBuf.readUInt16BE(tcpOffset + 2);
-    const tcpHeaderLen = ((rawBuf[tcpOffset + 12] >> 4) & 0x0f) * 4;
-    const payloadOffset = tcpOffset + tcpHeaderLen;
+    const tcpStart = ipStart + ihl;
+    if (packetData.length < tcpStart + 20) return null;
 
-    return {
-      tuple: { srcIp, dstIp, srcPort, dstPort, protocol: "TCP" },
-      payloadOffset: payloadOffset <= rawBuf.length ? payloadOffset : null
-    };
-  }
+    const srcPort = packetData.readUInt16BE(tcpStart);
+    const dstPort = packetData.readUInt16BE(tcpStart + 2);
+    const dataOffset = ((packetData[tcpStart + 12] >> 4) & 0x0f) * 4;
 
-  if (protocol === 17) {
-    const udpOffset = 14 + ipHeaderLen;
-    if (rawBuf.length < udpOffset + 8) return null;
-
-    const srcPort = rawBuf.readUInt16BE(udpOffset);
-    const dstPort = rawBuf.readUInt16BE(udpOffset + 2);
+    const payloadOffset = tcpStart + dataOffset;
 
     return {
-      tuple: { srcIp, dstIp, srcPort, dstPort, protocol: "UDP" },
-      payloadOffset: udpOffset + 8
+      tuple: { srcIp, dstIp, srcPort, dstPort, protocol: 'TCP' },
+      payloadOffset
     };
+  } catch {
+    return null;
   }
-
-  return null;
 }

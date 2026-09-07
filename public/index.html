@@ -11,7 +11,6 @@
 </head>
 <body>
   <div class="app-container">
-    <!-- Header -->
     <header class="navbar">
       <div class="brand">
         <span class="logo-icon">⚡</span>
@@ -26,7 +25,6 @@
       </div>
     </header>
 
-    <!-- Top Metrics Grid -->
     <section class="stats-grid">
       <div class="card stat-card">
         <span class="stat-label">Total Packets Parsed</span>
@@ -46,7 +44,6 @@
       </div>
     </section>
 
-    <!-- Controls Bar -->
     <section class="controls-bar card">
       <div class="controls-left">
         <button id="run-btn" class="btn btn-primary">
@@ -57,9 +54,7 @@
       <div id="status-message" class="system-status">Ready to analyze capture streams.</div>
     </section>
 
-    <!-- Main Data Panes -->
     <main class="dashboard-split">
-      <!-- Left Column: Extracted TLS SNI Details -->
       <section class="card panel">
         <div class="panel-header">
           <h2>Extracted TLS Hostnames (SNI)</h2>
@@ -83,7 +78,6 @@
         </div>
       </section>
 
-      <!-- Right Column: Live Ingestion Log -->
       <section class="card panel">
         <div class="panel-header">
           <h2>Live Stream Telemetry</h2>
@@ -110,6 +104,6 @@
     </main>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=3.0"></script>
 </body>
 </html>

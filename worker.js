@@ -5,7 +5,6 @@ import { classifyApp, AppType } from './types.js';
 const { type, id, rules } = workerData;
 
 if (type === 'LB') {
-  // Load Balancer Worker
   const fpPorts = [];
 
   parentPort.on('message', (msg) => {
@@ -20,7 +19,6 @@ if (type === 'LB') {
   });
 
 } else if (type === 'FP') {
-  // Fast Path Worker (DPI Inspection)
   const flows = new Map();
   let writerPort = null;
   const stats = { processed: 0, dropped: 0, forwarded: 0, apps: {} };
@@ -69,10 +67,9 @@ if (type === 'LB') {
     }
 
     stats.apps[flow.app] = (stats.apps[flow.app] || 0) + 1;
-
     const status = flow.blocked ? 'DROP' : 'FORWARD';
 
-    // Broadcast live event metadata back to the main thread UI
+    // Emit live event to main thread
     parentPort.postMessage({
       cmd: 'LIVE_EVENT',
       event: {
@@ -82,7 +79,8 @@ if (type === 'LB') {
         dstPort: tuple.dstPort,
         app: flow.app,
         sni: flow.sni,
-        status
+        status,
+        length: packetData.length
       }
     });
 
@@ -90,7 +88,9 @@ if (type === 'LB') {
       stats.dropped++;
     } else {
       stats.forwarded++;
-      writerPort.postMessage({ headerBuf, packetData }, [packetData.buffer]);
+      if (writerPort) {
+        writerPort.postMessage({ headerBuf, packetData }, [packetData.buffer]);
+      }
     }
   }
 }

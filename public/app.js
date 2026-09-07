@@ -19,145 +19,144 @@ const statSni = document.getElementById('stat-unique-sni');
 const sniTableBody = document.getElementById('sni-table-body');
 const packetTableBody = document.getElementById('packet-table-body');
 
-// Setup WebSocket
 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 const wsUrl = `${protocol}//${window.location.host}`;
 let socket = null;
 
 function connectWebSocket() {
-  socket = new WebSocket(wsUrl);
+    socket = new WebSocket(wsUrl);
 
-  socket.onopen = () => {
-    wsDot.className = 'dot connected';
-    wsText.textContent = 'Connected';
-  };
+    socket.onopen = () => {
+        console.log('[WS] Connected to live engine');
+        wsDot.className = 'dot connected';
+        wsText.textContent = 'Connected';
+    };
 
-  socket.onclose = () => {
-    wsDot.className = 'dot disconnected';
-    wsText.textContent = 'Disconnected';
-    setTimeout(connectWebSocket, 2000);
-  };
+    socket.onclose = () => {
+        console.log('[WS] Disconnected');
+        wsDot.className = 'dot disconnected';
+        wsText.textContent = 'Disconnected';
+        setTimeout(connectWebSocket, 2000);
+    };
 
-  socket.onerror = (err) => {
-    console.error('[WebSocket Error]', err);
-  };
+    socket.onerror = (err) => {
+        console.error('[WS Error]', err);
+    };
 
-  socket.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      handleServerEvent(data);
-    } catch (e) {
-      console.error('JSON parse error:', e);
-    }
-  };
+    socket.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            handleServerEvent(data);
+        } catch (e) {
+            console.error('JSON parse error:', e);
+        }
+    };
 }
 
 function handleServerEvent(msg) {
-  if (msg.type === 'INIT_STATE') {
-    if (msg.state && msg.state.history && msg.state.history.length > 0) {
-      msg.state.history.slice().reverse().forEach((evt) => renderEvent(evt));
+    if (msg.type === 'INIT_STATE') {
+        if (msg.state && msg.state.history && msg.state.history.length > 0) {
+            msg.state.history.slice().reverse().forEach((evt) => renderEvent(evt));
+        }
     }
-  }
 
-  if (msg.type === 'RESET') {
-    resetDashboardUI();
-    engineStatus.textContent = 'Running';
-    engineStatus.className = 'stat-value status-running';
-    statusMessage.textContent = 'Worker threads actively inspecting packet streams...';
-    runBtn.disabled = true;
-  }
+    if (msg.type === 'RESET') {
+        resetDashboardUI();
+        engineStatus.textContent = 'Running';
+        engineStatus.className = 'stat-value status-running';
+        statusMessage.textContent = 'Worker threads actively inspecting packet streams...';
+        runBtn.disabled = true;
+    }
 
-  if (msg.type === 'PACKET_EVENT') {
-    renderEvent(msg.event);
-  }
+    if (msg.type === 'PACKET_EVENT') {
+        renderEvent(msg.event);
+    }
 
-  if (msg.type === 'STATUS' && msg.status === 'COMPLETED') {
-    engineStatus.textContent = 'Finished';
-    engineStatus.className = 'stat-value status-done';
-    statusMessage.textContent = 'Inspection complete. Telemetry synchronized.';
-    runBtn.disabled = false;
-  }
+    if (msg.type === 'STATUS' && msg.status === 'COMPLETED') {
+        engineStatus.textContent = 'Finished';
+        engineStatus.className = 'stat-value status-done';
+        statusMessage.textContent = 'Inspection complete. Telemetry synchronized.';
+        runBtn.disabled = false;
+    }
 }
 
 function renderEvent(evt) {
-  // Clear empty state placeholders
-  const placeholder1 = sniTableBody.querySelector('.empty-placeholder');
-  if (placeholder1) placeholder1.remove();
+    const p1 = sniTableBody.querySelector('.empty-placeholder');
+    if (p1) p1.remove();
 
-  const placeholder2 = packetTableBody.querySelector('.empty-placeholder');
-  if (placeholder2) placeholder2.remove();
+    const p2 = packetTableBody.querySelector('.empty-placeholder');
+    if (p2) p2.remove();
 
-  totalPackets++;
-  if (evt.status === 'FORWARD') forwardedPackets++;
-  else droppedPackets++;
+    totalPackets++;
+    if (evt.status === 'FORWARD') forwardedPackets++;
+    else droppedPackets++;
 
-  statTotal.textContent = totalPackets.toLocaleString();
+    statTotal.textContent = totalPackets.toLocaleString();
 
-  const sni = evt.sni || null;
-  const src = `${evt.srcIp || '192.168.1.10'}:${evt.srcPort || '—'}`;
-  const dst = `${evt.dstIp || '—'}:${evt.dstPort || '—'}`;
+    const sni = evt.sni || null;
+    const src = `${evt.srcIp || '192.168.1.10'}:${evt.srcPort || '—'}`;
+    const dst = `${evt.dstIp || '—'}:${evt.dstPort || '—'}`;
 
-  // 1. TLS SNI table
-  if (sni) {
-    uniqueHostnames.add(sni);
-    statFlows.textContent = uniqueHostnames.size.toString();
-    statSni.textContent = uniqueHostnames.size.toString();
+    // Extracted SNI table
+    if (sni) {
+        uniqueHostnames.add(sni);
+        statFlows.textContent = uniqueHostnames.size.toString();
+        statSni.textContent = uniqueHostnames.size.toString();
 
-    const sniRow = document.createElement('tr');
-    sniRow.innerHTML = `
+        const sniRow = document.createElement('tr');
+        sniRow.innerHTML = `
       <td>${new Date().toLocaleTimeString()}</td>
       <td>${src}</td>
       <td class="tag-sni">${sni}</td>
     `;
-    sniTableBody.prepend(sniRow);
-  }
+        sniTableBody.prepend(sniRow);
+    }
 
-  // 2. Stream Telemetry log
-  const logRow = document.createElement('tr');
-  const isDrop = evt.status === 'DROP';
-  logRow.innerHTML = `
+    // Live Stream Log
+    const logRow = document.createElement('tr');
+    const isDrop = evt.status === 'DROP';
+    logRow.innerHTML = `
     <td>#${totalPackets}</td>
     <td><span style="color: ${isDrop ? 'var(--accent-danger)' : 'var(--accent-success)'}; font-weight: bold;">${evt.status}</span></td>
-    <td>${src} &rarr; ${dst}</td>
+    <td>${evt.length || 512} B</td>
     <td>${sni ? `Target: <strong>${sni}</strong> (${evt.app || 'TLS'})` : (evt.app || 'TCP Stream')}</td>
   `;
-  packetTableBody.prepend(logRow);
+    packetTableBody.prepend(logRow);
 
-  if (packetTableBody.children.length > 50) {
-    packetTableBody.lastElementChild.remove();
-  }
+    if (packetTableBody.children.length > 50) {
+        packetTableBody.lastElementChild.remove();
+    }
 }
 
-// Trigger Inspection via WebSocket
 runBtn.addEventListener('click', () => {
-  if (socket && socket.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({ cmd: 'START_ANALYSIS' }));
-    engineStatus.textContent = 'Running';
-    engineStatus.className = 'stat-value status-running';
-    runBtn.disabled = true;
-    statusMessage.textContent = 'Starting inspection pipeline...';
-  }
+    if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ cmd: 'START_ANALYSIS' }));
+        engineStatus.textContent = 'Running';
+        engineStatus.className = 'stat-value status-running';
+        runBtn.disabled = true;
+        statusMessage.textContent = 'Starting inspection pipeline...';
+    }
 });
 
 function resetDashboardUI() {
-  totalPackets = 0;
-  forwardedPackets = 0;
-  droppedPackets = 0;
-  uniqueHostnames.clear();
+    totalPackets = 0;
+    forwardedPackets = 0;
+    droppedPackets = 0;
+    uniqueHostnames.clear();
 
-  statTotal.textContent = '0';
-  statFlows.textContent = '0';
-  statSni.textContent = '0';
+    statTotal.textContent = '0';
+    statFlows.textContent = '0';
+    statSni.textContent = '0';
 
-  sniTableBody.innerHTML = '<tr class="empty-placeholder"><td colspan="3">No SNI hostnames captured yet. Click "Run Inspection".</td></tr>';
-  packetTableBody.innerHTML = '<tr class="empty-placeholder"><td colspan="4">Stream awaiting payload...</td></tr>';
+    sniTableBody.innerHTML = '<tr class="empty-placeholder"><td colspan="3">No SNI hostnames captured yet. Click "Run Inspection".</td></tr>';
+    packetTableBody.innerHTML = '<tr class="empty-placeholder"><td colspan="4">Stream awaiting payload...</td></tr>';
 }
 
 clearBtn.addEventListener('click', () => {
-  resetDashboardUI();
-  engineStatus.textContent = 'Idle';
-  engineStatus.className = 'stat-value status-idle';
-  statusMessage.textContent = 'Ready to analyze capture streams.';
+    resetDashboardUI();
+    engineStatus.textContent = 'Idle';
+    engineStatus.className = 'stat-value status-idle';
+    statusMessage.textContent = 'Ready to analyze capture streams.';
 });
 
 connectWebSocket();

@@ -12,8 +12,8 @@ import { hash5Tuple } from './types.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const inputFile = process.argv[2] || 'test_dpi.pcap';
-const outputFile = process.argv[3] || 'filtered.pcap';
+const inputFile = path.resolve(__dirname, process.argv[2] || 'test_dpi.pcap');
+const outputFile = path.resolve(__dirname, process.argv[3] || 'filtered.pcap');
 const PORT = process.env.PORT || 3000;
 
 const NUM_LBS = 2;
@@ -25,23 +25,20 @@ const rules = {
   blockedIPs: ['192.168.1.50']
 };
 
-// Helper: Ensure the PCAP file exists on cloud platforms (e.g., Render)
 function ensurePcapFileExists() {
   if (!fs.existsSync(inputFile)) {
-    console.log(`[DPI Engine] "${inputFile}" not found. Generating test PCAP traffic...`);
+    console.log(`[DPI Engine] PCAP not found at "${inputFile}". Generating test traffic...`);
     try {
-      execSync('node generate_pcap.js', { stdio: 'inherit' });
-      console.log(`[DPI Engine] Successfully generated "${inputFile}".`);
+      execSync(`node "${path.join(__dirname, 'generate_pcap.js')}"`, { stdio: 'inherit', cwd: __dirname });
     } catch (err) {
-      console.error('[DPI Engine] Failed to generate sample PCAP:', err.message);
+      console.error('[DPI Engine Error] Failed to generate sample PCAP:', err.message);
     }
   }
 }
 
-// Initial check on boot
+// Ensure test_dpi.pcap is created on startup
 ensurePcapFileExists();
 
-// In-memory state to hydrate newly connected/refreshed browsers
 const serverState = {
   total: 0,
   forwarded: 0,
@@ -60,8 +57,8 @@ const clients = new Set();
 
 wss.on('connection', (ws) => {
   clients.add(ws);
+  console.log(`[WS] Client connected. Total active: ${clients.size}`);
 
-  // Send historical snapshot immediately on connect/refresh
   ws.send(JSON.stringify({ type: 'INIT_STATE', state: serverState }));
 
   ws.on('message', async (raw) => {
@@ -73,13 +70,8 @@ wss.on('connection', (ws) => {
     } catch {}
   });
 
-  ws.on('close', () => {
-    clients.delete(ws);
-  });
-
-  ws.on('error', () => {
-    clients.delete(ws);
-  });
+  ws.on('close', () => clients.delete(ws));
+  ws.on('error', () => clients.delete(ws));
 });
 
 function broadcast(data) {
@@ -90,18 +82,16 @@ function broadcast(data) {
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
 let isRunning = false;
 
 async function runPipeline() {
   if (isRunning) return;
   isRunning = true;
 
-  // Guarantee the input file exists before opening stream
   ensurePcapFileExists();
 
   if (!fs.existsSync(inputFile)) {
-    console.error(`[Reader Error] Input file "${inputFile}" still does not exist.`);
+    console.error(`[Reader Error] Input file "${inputFile}" does not exist.`);
     broadcast({ type: 'STATUS', status: 'COMPLETED' });
     isRunning = false;
     return;
@@ -124,12 +114,17 @@ async function runPipeline() {
 
   const lbs = [];
   const fps = [];
+  const workerFile = path.join(__dirname, 'worker.js');
 
   for (let i = 0; i < NUM_LBS; i++) {
-    lbs.push(new Worker('./worker.js', { workerData: { type: 'LB', id: i, rules } }));
+    const lb = new Worker(workerFile, { workerData: { type: 'LB', id: i, rules } });
+    lb.on('error', (err) => console.error(`[LB ${i} Error]:`, err));
+    lbs.push(lb);
   }
   for (let i = 0; i < NUM_FPS; i++) {
-    fps.push(new Worker('./worker.js', { workerData: { type: 'FP', id: i, rules } }));
+    const fp = new Worker(workerFile, { workerData: { type: 'FP', id: i, rules } });
+    fp.on('error', (err) => console.error(`[FP ${i} Error]:`, err));
+    fps.push(fp);
   }
 
   lbs.forEach((lb) => {
@@ -199,14 +194,14 @@ async function runPipeline() {
       serverState.forwarded++;
     }
 
-    // Pacing delay (100ms) so you can clearly see packets animate in UI
-    await sleep(100);
+    // 120ms pacing delay for visible UI animation
+    await sleep(120);
   }
 
   fs.closeSync(inFd);
   lbs.forEach((lb) => lb.postMessage({ cmd: 'FLUSH' }));
 
-  // Wait for worker pipelines to clear
+  // Wait for worker queues to drain
   await sleep(1000);
 
   fs.closeSync(outFd);
@@ -219,6 +214,5 @@ async function runPipeline() {
 }
 
 server.listen(PORT, () => {
-  console.log(`\n[UI Server] Running at: http://localhost:${PORT}`);
-  console.log(`Open http://localhost:${PORT} in your browser and click "Run Inspection".\n`);
+  console.log(`\n[UI Server] Running at: http://localhost:${PORT}\n`);
 });
