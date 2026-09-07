@@ -80,7 +80,7 @@ function handleServerEvent(msg) {
 }
 
 function renderEvent(evt) {
-  // Clear placeholder rows
+  // Clear empty state placeholders
   const placeholder1 = sniTableBody.querySelector('.empty-placeholder');
   if (placeholder1) placeholder1.remove();
 
@@ -93,10 +93,11 @@ function renderEvent(evt) {
 
   statTotal.textContent = totalPackets.toLocaleString();
 
-  const sni = evt.sni || evt.domain || (evt.tuple && evt.tuple.sni) || null;
-  const src = evt.src || (evt.tuple ? `${evt.tuple.srcIp}:${evt.tuple.srcPort}` : '192.168.1.10');
+  const sni = evt.sni || null;
+  const src = `${evt.srcIp || '192.168.1.10'}:${evt.srcPort || '—'}`;
+  const dst = `${evt.dstIp || '—'}:${evt.dstPort || '—'}`;
 
-  // Track SNIs
+  // 1. TLS SNI table
   if (sni) {
     uniqueHostnames.add(sni);
     statFlows.textContent = uniqueHostnames.size.toString();
@@ -111,14 +112,14 @@ function renderEvent(evt) {
     sniTableBody.prepend(sniRow);
   }
 
-  // Live Stream Log
+  // 2. Stream Telemetry log
   const logRow = document.createElement('tr');
   const isDrop = evt.status === 'DROP';
   logRow.innerHTML = `
     <td>#${totalPackets}</td>
-    <td><span style="color: ${isDrop ? 'var(--accent-danger)' : 'var(--accent-success)'}">${evt.status || 'FORWARD'}</span></td>
-    <td>${evt.length || '512'} B</td>
-    <td>${sni ? `Target: ${sni}` : (evt.action || 'Payload Parsed')}</td>
+    <td><span style="color: ${isDrop ? 'var(--accent-danger)' : 'var(--accent-success)'}; font-weight: bold;">${evt.status}</span></td>
+    <td>${src} &rarr; ${dst}</td>
+    <td>${sni ? `Target: <strong>${sni}</strong> (${evt.app || 'TLS'})` : (evt.app || 'TCP Stream')}</td>
   `;
   packetTableBody.prepend(logRow);
 
@@ -127,7 +128,7 @@ function renderEvent(evt) {
   }
 }
 
-// Trigger Inspection directly over WebSocket
+// Trigger Inspection via WebSocket
 runBtn.addEventListener('click', () => {
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({ cmd: 'START_ANALYSIS' }));
